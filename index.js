@@ -4,6 +4,11 @@
 var path = require('path');
 var SilentError = require('silent-error');
 
+function add(options, name, array) {
+  var option = options[name] = options[name] || [];
+  option.push.apply(option, array);
+}
+
 module.exports = {
   name: 'ember-data',
 
@@ -22,7 +27,16 @@ module.exports = {
 
   init: function() {
     var bowerDeps = this.project.bowerDependencies();
+
     var VersionChecker = require('ember-cli-version-checker');
+    var options = this.options = this.options || {};
+
+    options.babel = options.babel || {};
+
+    if (process.env.EMBER_ENV === 'production') {
+      add(options.babel, 'backlist', ['es6.modules', 'useStrict']);
+      add(options.babel, 'plugins', require('./lib/stripped-build-plugins')());
+    }
 
     var checker = new VersionChecker(this);
     var shims = checker.for('ember-cli-shims', 'bower');
@@ -83,23 +97,11 @@ module.exports = {
 
     var version   = require('./lib/version');
     var merge     = require('broccoli-merge-trees');
-    var addonTree = merge([version(), dir]);
 
-    if (process.env.EMBER_ENV === 'production') {
-      var strippedBuild = require('./lib/stripped-build');
-
-      // blacklist es6.modules so the modules are not compiled but simply the
-      // debug statements / features are stripped; this is taken from
-      // ember-cli-babel:
-      // https://github.com/babel/ember-cli-babel/blob/master/index.js#L71
-      var strippedAddon = strippedBuild('ember-data', addonTree, {
-        blacklist: ['es6.modules', 'useStrict']
-      });
-
-      return this._super.treeForAddon.call(this, strippedAddon);
-    }
-
-    return this._super.treeForAddon.call(this, addonTree);
+    return this._super.treeForAddon.call(this, merge([
+      version(),
+      dir
+    ]));
   },
 
   included: function(app) {
